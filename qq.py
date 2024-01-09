@@ -30,15 +30,15 @@ class KnapsackEnv(gym.Env):
     
     def __init__(self, *args, **kwargs):
         # Generate data with consistent random seed to ensure reproducibility
-        self.N = 5
-        self.max_weight = 10
+        self.N = 10
+        self.max_weight = 50
         self.current_weight = 0
         self._max_reward = 10000
-        self.mask = True
+        self.mask = False
         self.seed = 0
         self.item_numbers = np.arange(self.N)
-        self.item_weights = np.array([1,2,3,4,5])
-        self.item_values = np.array([1,2,3,4,5])
+        self.item_weights = np.array([1,2,3,4,5,6,7,8,9,10])
+        self.item_values = np.array([1,2,3,4,5,6,7,8,9,10])
         self.over_packed_penalty = 0
         self.randomize_params_on_reset = False
         self.collected_items.clear()
@@ -92,12 +92,12 @@ class KnapsackEnv(gym.Env):
 class BoundedKnapsackEnv(KnapsackEnv):
     
     def __init__(self, *args, **kwargs):
-        self.N = 5
-        self.item_limits_init = np.random.randint(1, 10, size=self.N, dtype=np.int32)
-        self.item_limits = self.item_limits_init.copy()
+        self.N = 10
+        self.item_limits_init = np.array([2,2,2,2,2,2,2,2,2,2],dtype=np.int32)
+        self.item_limits = np.array([2,2,2,2,2,2,2,2,2,2],dtype=np.int32)
         super().__init__()
-        self.item_weights = np.array([1,2,3,4,5],dtype=np.int32)
-        self.item_values =np.array([1,2,3,4,5],dtype=np.int32)
+        self.item_weights = np.array([1,2,3,4,5,6,7,8,9,10],dtype=np.int32)
+        self.item_values =np.array([1,2,3,4,5,6,7,8,9,10],dtype=np.int32)
 
         assign_env_config(self, kwargs)
 
@@ -121,18 +121,18 @@ class BoundedKnapsackEnv(KnapsackEnv):
                 reward = self.item_values[item]
                 if self.current_weight == self.max_weight:
                     done = True
+                    # self._update_state(item)    
                 else:
                     done = False
-                self._update_state(item)
             else:
                 # End if over weight
-                reward = 0
+                reward = -1 #change
                 done = True
         else:
             # End if item is unavailable
-            reward = 0
+            reward = -1 #change
             done = True
-            
+        self._update_state(item)       
         return self.state, reward, done, {}
 
     def _update_state(self, item=None):
@@ -206,23 +206,23 @@ def update_state(env, item=None):
 
 def STEP(env,item):
     if env.item_limits[item] > 0:
-            # Check that item will fit
-            if env.item_weights[item] + env.current_weight <= env.max_weight:
-                env.current_weight += env.item_weights[item]
-                reward = env.item_values[item]
-                if env.current_weight == env.max_weight:
-                    done = True
-                else:
-                    done = False
+        # Check that item will fit
+        if env.item_weights[item] + env.current_weight <= env.max_weight:
+            env.current_weight += env.item_weights[item]
+            reward = env.item_values[item]
+            if env.current_weight == env.max_weight:
+                done = True
                 update_state(env,item)
             else:
-                # End if over weight
-                reward = 0
-                done = True
+                done = False
+        else:
+            # End if over weight
+            reward = -1 #change
+            done = True
     else:
         # End if item is unavailable
-        reward = 0
-        done = True
+        reward = -1 #change
+        done = False #change
         
     return env.state, reward, done, {}
 
@@ -234,6 +234,7 @@ def render(env):
         total_value += env.item_values[i]
         total_weight += env.item_weights[i]
     print(env.collected_items, total_value, total_weight)
+    # return None
     pass
 
 def RESET(env):
@@ -252,7 +253,7 @@ def RESET(env):
 np.random.seed(42)
 
 # Specify knapsack maximum weight
-MAX_WEIGHT = 300
+MAX_WEIGHT = 50 #change
 
 
 class NormalizingWrapper(ObservationWrapper):
@@ -293,7 +294,7 @@ class NormalizingWrapper(ObservationWrapper):
 def train_model(
     algorithm_class: Type[OnPolicyAlgorithm] = PPO,
     gamma: float = 0.99,
-    learning_rate: float = 0.0003,
+    learning_rate: float = 0.003,
     normalize_env: bool = True,
     activation_fn: Type[nn.Module] = nn.ReLU,
     net_arch=[256, 256],
@@ -307,7 +308,7 @@ def train_model(
         env = NormalizingWrapper(env)
 
     # Initialize environment by resetting
-    env.reset()
+    # env.reset()
    
     # Model definition
     model = algorithm_class(
@@ -341,16 +342,16 @@ model = train_model()
 
 env = BoundedKnapsackEnv( mask=False)
 
-combined = np.vstack((env.item_values, env.item_weights,env.item_limits))
-env = NormalizingWrapper(env)
-## convert your array into a dataframe
-df = pd.DataFrame (combined)
+# combined = np.vstack((env.item_values, env.item_weights,env.item_limits))
+# env = NormalizingWrapper(env)
+# ## convert your array into a dataframe
+# df = pd.DataFrame (combined)
 
-## save to xlsx file
+# ## save to xlsx file
 
-filepath = 'my_excel_file.xlsx'
+# filepath = 'my_excel_file.xlsx'
 
-df.to_excel(filepath, index=False)
+# df.to_excel(filepath, index=False)
 
 
 mean_reward, std_reward = evaluate_policy(
@@ -369,18 +370,18 @@ mean_reward, std_reward = evaluate_policy(
     )
 print(f"Mean reward over 1000 episodes: {mean_reward:.2f} +/- {std_reward:.2f}")
 
-render(env)
+# render(env)
 
 obs = RESET(env)
-obs = np.reshape(obs, (18,))   
+obs = np.reshape(obs, (33,))   
   
 states=None
 i=0
-while i<10:
-    action, states = model.predict(obs,states)
+while i<100:
+    action, states = model.predict(obs)
     obs, rewards, dones, info = STEP(env,action)
-    print(rewards)
-    obs = np.reshape(obs, (18,)) 
+    print(action, rewards)
+    obs = np.reshape(obs, (33,)) 
     i+=1
    
 
